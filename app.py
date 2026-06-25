@@ -851,35 +851,4 @@ elif st.session_state.stage == "result":
 
     st.caption("⚜️ 塔罗牌是自我探索的工具，解读仅供参考娱乐。")
 
-# ═══════════════════════════════════
-# 管理面板（侧边栏）
-# ═══════════════════════════════════
-with st.sidebar:
-    st.markdown("## 🔐 女巫后台")
-    pwd = st.text_input("管理密码", type="password", key="admin_pwd")
-    # 优先级: Streamlit Secrets > 本地文件 > 默认值
-    admin_pwd = st.secrets.get("ADMIN_PASSWORD", "")
-    if not admin_pwd:
-        ADMIN_FILE = "管理密码.txt"
-        if os.path.exists(ADMIN_FILE):
-            with open(ADMIN_FILE, "r", encoding="utf-8") as f:
-                admin_pwd = f.read().strip()
-        else:
-            admin_pwd = "admin888"
-    if pwd == admin_pwd:
-        st.success("✅ 已解锁")
-        st.markdown("### 🔑 生成解锁码")
-        if st.button("生成新解锁码"):
-            new_code = generate_unlock_code()
-            codes = _load_codes()
-            codes[new_code] = {"used": False, "created": str(datetime.datetime.now())}
-            _save_codes(codes)
-            st.code(new_code)
-            st.success("复制上方解锁码")
-        st.markdown("### 📊 统计")
-        codes = _load_codes()
-        used = sum(1 for c in codes.values() if c.get("used"))
-        unused = sum(1 for c in codes.values() if not c.get("used"))
-        st.markdown(f"- 已用: {used} 个\n- 未用: {unused} 个")
-    elif pwd:
-        st.error("密码错误")
+# 侧边栏 — 安静无干扰
