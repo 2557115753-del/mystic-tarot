@@ -857,11 +857,15 @@ elif st.session_state.stage == "result":
 with st.sidebar:
     st.markdown("## 🔐 女巫后台")
     pwd = st.text_input("管理密码", type="password", key="admin_pwd")
-    ADMIN_FILE = "管理密码.txt"
-    admin_pwd = "admin888"
-    if os.path.exists(ADMIN_FILE):
-        with open(ADMIN_FILE, "r", encoding="utf-8") as f:
-            admin_pwd = f.read().strip()
+    # 优先级: Streamlit Secrets > 本地文件 > 默认值
+    admin_pwd = st.secrets.get("ADMIN_PASSWORD", "")
+    if not admin_pwd:
+        ADMIN_FILE = "管理密码.txt"
+        if os.path.exists(ADMIN_FILE):
+            with open(ADMIN_FILE, "r", encoding="utf-8") as f:
+                admin_pwd = f.read().strip()
+        else:
+            admin_pwd = "admin888"
     if pwd == admin_pwd:
         st.success("✅ 已解锁")
         st.markdown("### 🔑 生成解锁码")
