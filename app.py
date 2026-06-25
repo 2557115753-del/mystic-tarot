@@ -730,17 +730,27 @@ elif st.session_state.stage == "result":
                 逐牌详解 · 宇宙讯息 · 注意事项<br>
                 仅需 <strong style="font-size:22px;color:#ffd700;">{UNLOCK_PRICE}</strong>
             </p>
-            <div style="background:rgba(0,0,0,0.3);padding:18px;border-radius:10px;margin:15px 0;">
-                <p style="color:#ffd700;font-size:15px;margin:0 0 10px 0;"><strong>📱 微信扫码支付</strong></p>
-                <p style="color:#ccc;font-size:12px;margin:5px 0;">1. 扫描下方赞赏码支付 {UNLOCK_PRICE}</p>
-                <p style="color:#ccc;font-size:12px;margin:5px 0;">2. 支付后截图发至下方微信</p>
-                <p style="color:#ccc;font-size:12px;margin:5px 0;">3. 即刻获取专属解锁码</p>
-                <p style="color:#ffd700;font-size:13px;margin:12px 0 5px 0;">微信：<strong>xiaolele866</strong></p>
-                <p style="color:#888;font-size:11px;">暗号：塔罗解锁</p>
-            </div>
-            <p style="color:#7b5ea0;font-size:11px;">已有解锁码？下方输入即可</p>
         </div>
         """, unsafe_allow_html=True)
+
+        # 微信收款码
+        import base64 as b64
+        qr_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "card_images", "pay_qr.png")
+        if os.path.exists(qr_path):
+            with open(qr_path, "rb") as f:
+                qr_b64 = b64.b64encode(f.read()).decode()
+            col_q1, col_q2, col_q3 = st.columns([1, 1.5, 1])
+            with col_q2:
+                st.markdown(f"""
+                <div style="text-align:center;background:rgba(0,0,0,0.2);padding:15px;border-radius:12px;margin:10px 0;">
+                    <img src="data:image/png;base64,{qr_b64}" style="width:200px;border-radius:8px;">
+                    <p style="color:#ccc;font-size:12px;margin:8px 0 3px 0;">微信扫码支付 {UNLOCK_PRICE}</p>
+                    <p style="color:#888;font-size:11px;margin:3px 0;">支付后截图发送微信：<strong style="color:#ffd700;">xiaolele866</strong></p>
+                    <p style="color:#666;font-size:10px;">发送暗号「塔罗解锁」即刻获取解锁码</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+        st.markdown('<p style="text-align:center;color:#7b5ea0;font-size:11px;">已有解锁码？在下方输入</p>', unsafe_allow_html=True)
 
         # 解锁码输入
         col_code1, col_code2, col_code3 = st.columns([1, 1.5, 1])
