@@ -727,15 +727,18 @@ elif st.session_state.stage == "result":
             <div style="font-size:40px;margin-bottom:10px;">🔮</div>
             <h3 style="color:#ffd700;">解锁完整命运解读</h3>
             <p style="color:#c9a0dc;font-size:14px;">
-                包含详细的逐牌详解、宇宙讯息和注意事项<br>
+                逐牌详解 · 宇宙讯息 · 注意事项<br>
                 仅需 <strong style="font-size:22px;color:#ffd700;">{UNLOCK_PRICE}</strong>
             </p>
-            <div style="background:rgba(0,0,0,0.3);padding:15px;border-radius:10px;margin:15px 0;">
-                <p style="color:#aaa;font-size:12px;margin:0;">📱 添加微信 <strong style="color:#ffd700;">xiaolele866</strong></p>
-                <p style="color:#aaa;font-size:12px;margin:5px 0;">发送暗号「<strong style="color:#ffd700;">塔罗解锁</strong>」获取解锁码</p>
-                <p style="color:#666;font-size:11px;">付款后即刻回复解锁码</p>
+            <div style="background:rgba(0,0,0,0.3);padding:18px;border-radius:10px;margin:15px 0;">
+                <p style="color:#ffd700;font-size:15px;margin:0 0 10px 0;"><strong>📱 微信扫码支付</strong></p>
+                <p style="color:#ccc;font-size:12px;margin:5px 0;">1. 扫描下方赞赏码支付 {UNLOCK_PRICE}</p>
+                <p style="color:#ccc;font-size:12px;margin:5px 0;">2. 支付后截图发至下方微信</p>
+                <p style="color:#ccc;font-size:12px;margin:5px 0;">3. 即刻获取专属解锁码</p>
+                <p style="color:#ffd700;font-size:13px;margin:12px 0 5px 0;">微信：<strong>xiaolele866</strong></p>
+                <p style="color:#888;font-size:11px;">暗号：塔罗解锁</p>
             </div>
-            <p style="color:#7b5ea0;font-size:11px;">已有解锁码？在下方输入</p>
+            <p style="color:#7b5ea0;font-size:11px;">已有解锁码？下方输入即可</p>
         </div>
         """, unsafe_allow_html=True)
 
