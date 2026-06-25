@@ -1,0 +1,6 @@
+__pycache__/
+*.json
+!styles_data.json
+管理密码.txt
+error.log
+fund_error.log
