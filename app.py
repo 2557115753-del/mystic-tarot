@@ -358,6 +358,8 @@ input { background: rgba(15,8,35,0.9) !important; border: 1px solid rgba(155,89,
 @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
 
 @media (max-width:768px) {
+    .stButton > button { font-size: 16px !important; padding: 12px 28px !important; }
+    #witch-container { transform: scale(0.5); right: -5% !important; bottom: -30px !important; opacity: 0.4; }
     h1 { font-size: 1.8rem !important; }
     .stButton > button { font-size: 16px !important; padding: 12px 28px !important; }
 }
@@ -391,7 +393,7 @@ st.markdown("""
     pointer-events:none;z-index:0;animation:shootingStar 3.5s ease-in 10s infinite;"></div>
 
 <!-- 女巫 -->
-<div style="position:fixed;bottom:0;right:6%;pointer-events:none;z-index:2;animation:witchFloat 7s ease-in-out infinite;">
+<div id="witch-container" style="position:fixed;bottom:0;right:6%;pointer-events:none;z-index:2;animation:witchFloat 7s ease-in-out infinite;">
     <div style="position:relative;width:100px;height:200px;">
         <div style="position:absolute;top:-15px;left:-20px;width:140px;height:140px;border-radius:50%;
             background:radial-gradient(circle,rgba(160,100,220,0.2)0%,rgba(80,30,140,0.05)60%,transparent 70%);
@@ -745,7 +747,7 @@ elif st.session_state.stage == "result":
                 <div style="text-align:center;background:rgba(0,0,0,0.2);padding:15px;border-radius:12px;margin:10px 0;">
                     <img src="data:image/png;base64,{qr_b64}" style="width:200px;border-radius:8px;">
                     <p style="color:#ccc;font-size:12px;margin:8px 0 3px 0;">微信扫码支付 {UNLOCK_PRICE}</p>
-                    <p style="color:#888;font-size:11px;margin:3px 0;">支付后截图发送微信：<strong style="color:#ffd700;">xiaolele866</strong></p>
+                    <p style="color:#888;font-size:11px;margin:3px 0;">支付后截图发送微信：<strong style="color:#ffd700;">fjwjrbrnkw0</strong></p>
                     <p style="color:#666;font-size:10px;">发送暗号「塔罗解锁」即刻获取解锁码</p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -785,66 +787,101 @@ elif st.session_state.stage == "result":
         st.markdown(f'<div class="reading-text" style="background:rgba(15,8,35,0.7);border-left:3px solid #ffd700;padding:20px;border-radius:0 12px 12px 0;margin:10px 0;color:#e0d5f0;line-height:1.8;">{free_part}\n\n{paid_part}</div>', unsafe_allow_html=True)
         st.success("✅ 你已解锁完整内容")
 
-        # 分享
+        # 分享 + 分享两次免费解锁
         st.markdown('<div class="divider">✦ ✦ ✦</div>', unsafe_allow_html=True)
         card_names = " · ".join([f"{c['emoji']}{c['name']}" for c in cards])
         share_title = "🔮 我的星幕之下 · 灵魂占卜结果"
         share_text = f"我刚完成了塔罗占卜！我的三张命运之牌是：{card_names}。来看看你的牌是什么？"
-        share_url = "http://112.38.138.111:8512"
+        share_url = "https://quant-model-u8qlraudbumgg5bmj6h8wo.streamlit.app"
+        # 预设一个免费解锁码
+        free_code = "TAROT-FREE-" + str(random.randint(10000000, 99999999))
+
+        # 将免费码写入数据库
+        codes_db = _load_codes()
+        codes_db[free_code] = {"used": False, "created": "share-reward"}
+        _save_codes(codes_db)
 
         st.markdown(f"""
         <div style="text-align:center;margin:20px 0;">
-            <p style="color:#c9a0dc;font-size:16px;margin-bottom:15px;">📤 分享你的命运牌面</p>
+            <p style="color:#ffd700;font-size:16px;margin-bottom:5px;">🎁 分享2次，免费解锁</p>
+            <p style="color:#888;font-size:12px;margin-bottom:15px;">分享给两个朋友即可免费获取解锁码</p>
+            <div id="share-count-bar" style="display:flex;gap:10px;justify-content:center;align-items:center;margin:10px 0;">
+                <div id="share-slot-1" style="width:40px;height:40px;border-radius:50%;border:2px dashed #9b59b6;display:flex;align-items:center;justify-content:center;font-size:18px;color:#9b59b6;">?</div>
+                <div id="share-slot-2" style="width:40px;height:40px;border-radius:50%;border:2px dashed #9b59b6;display:flex;align-items:center;justify-content:center;font-size:18px;color:#9b59b6;">?</div>
+            </div>
+            <div id="free-code-box" style="display:none;background:rgba(0,0,0,0.4);padding:15px;border-radius:10px;margin:15px 0;border:2px solid #ffd700;">
+                <p style="color:#ffd700;font-size:14px;margin:0;">🎉 恭喜！你的免费解锁码：</p>
+                <p style="color:#fff;font-size:22px;font-weight:bold;margin:8px 0;font-family:monospace;">{free_code}</p>
+                <p style="color:#888;font-size:11px;">复制此码，在下方输入框解锁</p>
+            </div>
             <div id="share-buttons" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
-                <button onclick="shareNative()" id="nativeShareBtn"
-                    style="display:none;background:linear-gradient(135deg,#7b2d8b,#a855f7);color:#fff;border:none;
+                <button onclick="doShare()" id="nativeShareBtn2"
+                    style="background:linear-gradient(135deg,#7b2d8b,#a855f7);color:#fff;border:none;
                     border-radius:25px;padding:14px 32px;font-size:16px;cursor:pointer;
                     box-shadow:0 0 20px rgba(155,89,182,0.4);">
                     📲 分享给好友
                 </button>
-                <button onclick="copyShareText()"
+                <button onclick="doCopyShare()"
                     style="background:linear-gradient(135deg,#3a1050,#7b2d8b);color:#d4a8ff;border:1px solid #9b59b6;
                     border-radius:25px;padding:14px 32px;font-size:16px;cursor:pointer;
                     box-shadow:0 0 15px rgba(155,89,182,0.3);">
-                    📋 复制分享文案
+                    📋 复制文案分享
                 </button>
             </div>
-            <p id="copyConfirm" style="color:#4caf50;font-size:13px;margin-top:10px;display:none;">✅ 已复制！去微信/QQ/朋友圈粘贴发送吧</p>
+            <p id="copyConfirm2" style="color:#4caf50;font-size:13px;margin-top:10px;display:none;">已复制！去微信/QQ粘贴发送。分享2次即可解锁免费码</p>
         </div>
         <script>
-            // 移动端显示原生分享按钮
-            if (navigator.share) {{
-                document.getElementById('nativeShareBtn').style.display = 'inline-block';
-            }}
+            let shareCount = parseInt(localStorage.getItem('tarot_share_count') || '0');
+            updateShareUI();
 
-            async function shareNative() {{
-                try {{
-                    await navigator.share({{
-                        title: '{share_title}',
-                        text: '{share_text}',
-                        url: '{share_url}',
-                    }});
-                }} catch (err) {{}}
-            }}
-
-            async function copyShareText() {{
-                const text = '{share_text} {share_url}';
-                try {{
-                    await navigator.clipboard.writeText(text);
-                }} catch(e) {{
-                    const ta = document.createElement('textarea');
-                    ta.value = text;
-                    ta.style.position = 'fixed';
-                    ta.style.left = '-9999px';
-                    document.body.appendChild(ta);
-                    ta.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(ta);
+            function updateShareUI() {{
+                if (shareCount >= 2) {{
+                    document.getElementById('share-slot-1').innerHTML = '✓'; shareCount = 2;
+                    document.getElementById('share-slot-2').innerHTML = '✓';
+                    document.getElementById('share-slot-1').style.borderColor = '#4caf50';
+                    document.getElementById('share-slot-2').style.borderColor = '#4caf50';
+                    document.getElementById('share-slot-1').style.color = '#4caf50';
+                    document.getElementById('share-slot-2').style.color = '#4caf50';
+                    document.getElementById('free-code-box').style.display = 'block';
+                    document.getElementById('nativeShareBtn2').textContent = '再分享一次';
+                    document.getElementById('nativeShareBtn2').disabled = true;
+                    document.getElementById('nativeShareBtn2').style.opacity = '0.5';
+                }} else if (shareCount >= 1) {{
+                    document.getElementById('share-slot-1').innerHTML = '✓';
+                    document.getElementById('share-slot-1').style.borderColor = '#4caf50';
+                    document.getElementById('share-slot-1').style.color = '#4caf50';
+                    document.getElementById('nativeShareBtn2').textContent = '再分享1次解锁';
                 }}
-                document.getElementById('copyConfirm').style.display = 'block';
-                setTimeout(function() {{
-                    document.getElementById('copyConfirm').style.display = 'none';
-                }}, 3000);
+            }}
+
+            function addShareCount() {{
+                shareCount = Math.min(2, shareCount + 1);
+                localStorage.setItem('tarot_share_count', shareCount);
+                updateShareUI();
+            }}
+
+            async function doShare() {{
+                if (navigator.share) {{
+                    try {{
+                        await navigator.share({{title: '{share_title}', text: '{share_text}', url: '{share_url}'}});
+                        addShareCount();
+                    }} catch(e) {{}}
+                }} else {{
+                    doCopyShare();
+                }}
+            }}
+
+            async function doCopyShare() {{
+                const text = '{share_text} {share_url}';
+                try {{ await navigator.clipboard.writeText(text); }} catch(e) {{
+                    const ta = document.createElement('textarea'); ta.value = text;
+                    ta.style.position = 'fixed'; ta.style.left = '-9999px';
+                    document.body.appendChild(ta); ta.select();
+                    document.execCommand('copy'); document.body.removeChild(ta);
+                }}
+                document.getElementById('copyConfirm2').style.display = 'block';
+                setTimeout(function(){{ document.getElementById('copyConfirm2').style.display = 'none'; }}, 3000);
+                addShareCount();
             }}
         </script>
         """, unsafe_allow_html=True)
