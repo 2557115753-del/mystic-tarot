@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """星幕之下 · 灵魂占卜 — 答题式神秘体验 | 半遮结果 | 付费解锁"""
-import sys, os, json, datetime, hashlib, uuid, random, requests, time
+import sys, os, json, datetime, hashlib, uuid, random, requests, time, urllib.parse
 import streamlit as st
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -15,6 +15,12 @@ API_KEY = "sk-5abb7609eb9649ec90dda47466d821d6"
 API_URL = "https://api.deepseek.com/v1/chat/completions"
 UNLOCK_PRICE = "¥0.5"
 
+# 面包多配置
+MB_PRODUCT_URL = "https://mbd.pub/o/bread/YZaTmpxsaw=="
+MB_KEY = os.environ.get("MB_KEY", "")
+MB_ORDER_API = "https://x.mianbaoduo.com/api/order-detail"
+MB_ORDER_API2 = "https://mbd.pub/api/v1/orders/query
+
 # ═══════════════════════════════════
 # 解锁码管理
 # ═══════════════════════════════════
@@ -26,8 +32,12 @@ def _save_codes(d):
     with open(UNLOCK_FILE, "w", encoding="utf-8") as f: json.dump(d, f, ensure_ascii=False, indent=2)
 
 def generate_unlock_code():
-    """生成唯一解锁码"""
-    return f"TAROT-{uuid.uuid4().hex[:8].upper()}"
+    """生成唯一解锁码并自动存入数据库"""
+    code = f"TAROT-{uuid.uuid4().hex[:8].upper()}"
+    codes = _load_codes()
+    codes[code] = {"used": False, "created": str(datetime.datetime.now())[:19]}
+    _save_codes(codes)
+    return code
 
 def is_code_used(code):
     codes = _load_codes()
@@ -39,6 +49,22 @@ def mark_code_used(code):
         codes[code]["used"] = True
         codes[code]["used_at"] = str(datetime.datetime.now())
         _save_codes(codes)
+
+def verify_payment(order_id):
+    """调用面包多API直接验证"""
+    if not order_id or not order_id.strip() or not MB_KEY:
+        return False, ""
+    try:
+        resp = requests.get(MB_ORDER_API,
+            headers={"x-token": MB_KEY},
+            params={"order_id": order_id.strip()},
+            timeout=10)
+        data = resp.json()
+        if data.get("state") == 1:
+            return True, order_id.strip()
+    except:
+        pass
+    return False, ""
 
 # ═══════════════════════════════════
 # AI解读
@@ -442,6 +468,13 @@ if "stage" not in st.session_state:
     st.session_state.ai_reading = None
     st.session_state.unlock_code = None
     st.session_state.show_full = False
+    st.session_state.paid_token = None  # 面包多支付token
+    # 检测URL参数中的token（支付服务器跳转回来的）
+    qp = st.query_params.to_dict() if hasattr(st, "query_params") else {}
+    token_from_url = qp.get("token", "")
+    if token_from_url:
+        st.session_state.paid_token = token_from_url
+        st.session_state.show_full = True
 
 # ═══════════════════════════════════
 # Stage 1: 神秘开场页
@@ -497,17 +530,14 @@ def _draw_cards_based_on_answers():
     paid_style = _random.choice(other_styles) if other_styles else free_style
     paid_reading = generate_reading(cards, style=paid_style)
 
-    # 免费部分 = 免费风格的前半段（签文+风格+过去）
-    # 付费部分 = 免费风格的后半段 + 额外风格的完整版
-    free_split = free_reading.find("### 当下")
-    if free_split < 0:
-        free_split = free_reading.find("### ⚡ 当下")
+    # 免费部分 = 只显示签文，付费部分 = 风格介绍+逐牌详解+小结
+    free_split = free_reading.find("## 今日解读风格")
     if free_split > 0:
         st.session_state.free_part = free_reading[:free_split].strip()
         st.session_state.paid_part = free_reading[free_split:].strip()
     else:
-        st.session_state.free_part = free_reading
-        st.session_state.paid_part = ""
+        st.session_state.free_part = free_reading[:200]
+        st.session_state.paid_part = free_reading
 
     # 额外附赠一个不同风格的完整解读
     st.session_state.paid_part += f"\n\n---\n\n## 🔮 额外解读：{paid_style['name']}\n\n{paid_reading}"
@@ -694,6 +724,33 @@ elif st.session_state.stage == "result":
     if not show_full:
         st.markdown('<div class="divider">🔒 🔒 🔒</div>', unsafe_allow_html=True)
 
+        # 分享2次免费解锁（付费墙前）
+        st.markdown("""
+        <div style="text-align:center;margin:15px 0;background:rgba(30,15,60,0.4);border-radius:16px;padding:18px;border:1px solid rgba(255,215,0,0.2);">
+            <p style="color:#ffd700;font-size:15px;margin-bottom:5px;">🎁 分享2次 · 免费解锁</p>
+            <p style="color:#888;font-size:11px;">分享给两个朋友即可获得免费解锁码</p>
+            <div id="share-dots" style="display:flex;gap:15px;justify-content:center;margin:12px 0;">
+                <div id="dot1" style="width:36px;height:36px;border-radius:50%;border:2px dashed #9b59b6;display:flex;align-items:center;justify-content:center;font-size:16px;color:#9b59b6;">·</div>
+                <div id="dot2" style="width:36px;height:36px;border-radius:50%;border:2px dashed #9b59b6;display:flex;align-items:center;justify-content:center;font-size:16px;color:#9b59b6;">·</div>
+            </div>
+            <div id="free-reveal" style="display:none;background:rgba(0,0,0,0.5);padding:12px;border-radius:8px;margin:10px 0;border:1px solid #ffd700;">
+                <p style="color:#ffd700;font-size:12px;margin:0;">🎉 解锁码：<strong style="font-size:18px;">SHARE2FREE</strong></p>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+                <button onclick="shareNow()" style="background:#7b2d8b;color:#fff;border:none;border-radius:20px;padding:10px 24px;font-size:14px;cursor:pointer;">📲 分享</button>
+                <button onclick="copyNow()" style="background:#3a1050;color:#d4a8ff;border:1px solid #9b59b6;border-radius:20px;padding:10px 24px;font-size:14px;cursor:pointer;">📋 复制</button>
+            </div>
+            <p id="tip2" style="color:#4caf50;font-size:11px;margin-top:8px;display:none;">已复制！分享2次即可</p>
+        </div>
+        <script>
+            let ss = parseInt(localStorage.getItem("ts2")||"0");
+            function upd2(){if(ss>=2){document.getElementById("dot1").innerHTML="✓";document.getElementById("dot2").innerHTML="✓";document.getElementById("dot1").style.borderColor="#4caf50";document.getElementById("dot2").style.borderColor="#4caf50";document.getElementById("free-reveal").style.display="block"}else if(ss>=1){document.getElementById("dot1").innerHTML="✓";document.getElementById("dot1").style.borderColor="#4caf50"}}upd2();
+            function inc2(){ss=Math.min(2,ss+1);localStorage.setItem("ts2",ss);upd2();}
+            async function shareNow(){if(navigator.share){try{await navigator.share({title:"星幕之下·灵魂占卜",text:"我刚完成塔罗占卜！来看看你的命运之牌",url:"https://quant-model-u8qlraudbumgg5bmj6h8wo.streamlit.app"});inc2()}catch(e){}}else{copyNow()}}
+            async function copyNow(){const t="我刚完成塔罗占卜！来看看你的命运之牌 https://quant-model-u8qlraudbumgg5bmj6h8wo.streamlit.app";try{await navigator.clipboard.writeText(t)}catch(e){const ta=document.createElement("textarea");ta.value=t;ta.style.position="fixed";ta.style.left="-9999px";document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta)}document.getElementById("tip2").style.display="block";setTimeout(function(){document.getElementById("tip2").style.display="none"},3000);inc2()}
+        </script>
+        """, unsafe_allow_html=True)
+
         # 好奇钩子
         c0_name = cards[0]['name']
         c1_name = cards[1]['name']
@@ -723,9 +780,9 @@ elif st.session_state.stage == "result":
         </div>
         """, unsafe_allow_html=True)
 
-        # 付费区域
+        # 付费区域 — 面包多自动收款
         st.markdown(f"""
-        <div class="paywall-overlay" style="animation:pulse 2s ease-in-out infinite;">
+        <div class="paywall-overlay">
             <div style="font-size:40px;margin-bottom:10px;">🔮</div>
             <h3 style="color:#ffd700;">解锁完整命运解读</h3>
             <p style="color:#c9a0dc;font-size:14px;">
@@ -735,40 +792,58 @@ elif st.session_state.stage == "result":
         </div>
         """, unsafe_allow_html=True)
 
-        # 微信收款码
-        import base64 as b64
-        qr_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "card_images", "pay_qr.png")
-        if os.path.exists(qr_path):
-            with open(qr_path, "rb") as f:
-                qr_b64 = b64.b64encode(f.read()).decode()
-            col_q1, col_q2, col_q3 = st.columns([1, 1.5, 1])
-            with col_q2:
-                st.markdown(f"""
-                <div style="text-align:center;background:rgba(0,0,0,0.2);padding:15px;border-radius:12px;margin:10px 0;">
-                    <img src="data:image/png;base64,{qr_b64}" style="width:200px;border-radius:8px;">
-                    <p style="color:#ccc;font-size:12px;margin:8px 0 3px 0;">微信扫码支付 {UNLOCK_PRICE}</p>
-                    <p style="color:#888;font-size:11px;margin:3px 0;">支付后截图发送微信：<strong style="color:#ffd700;">fjwjrbrnkw0</strong></p>
-                    <p style="color:#666;font-size:10px;">发送暗号「塔罗解锁」即刻获取解锁码</p>
+        # 面包多支付按钮
+        col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+        with col_btn2:
+            st.markdown(f"""
+            <a href="{MB_PRODUCT_URL}" target="_blank" style="text-decoration:none;">
+                <div style="background:linear-gradient(135deg,#FF6B35,#F7931E,#FFD700);color:#fff;
+                    text-align:center;padding:16px 20px;border-radius:30px;font-size:18px;font-weight:bold;
+                    cursor:pointer;box-shadow:0 4px 20px rgba(255,107,53,0.4);transition:0.3s;"
+                    onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 30px rgba(255,107,53,0.6)';"
+                    onmouseout="this.style.transform='';this.style.boxShadow='0 4px 20px rgba(255,107,53,0.4)';">
+                    💰 微信/支付宝支付 {UNLOCK_PRICE}
                 </div>
-                """, unsafe_allow_html=True)
+            </a>
+            """, unsafe_allow_html=True)
 
-        st.markdown('<p style="text-align:center;color:#7b5ea0;font-size:11px;">已有解锁码？在下方输入</p>', unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
 
-        # 解锁码输入
+        # 面包多订单号验证（全自动）
+        st.markdown('<p style="text-align:center;color:#ffd700;font-size:14px;">📱 支付完成后，粘贴面包多订单号自动解锁</p>', unsafe_allow_html=True)
+        col_o1, col_o2, col_o3 = st.columns([1, 1.5, 1])
+        with col_o2:
+            order_id = st.text_input("输入面包多订单号", placeholder="支付成功后复制订单号", key="mb_order_input")
+            if st.button("🔓 自动验证解锁", use_container_width=True, key="mb_verify_btn"):
+                if order_id.strip():
+                    with st.spinner("验证中..."):
+                        ok, token = verify_payment(order_id.strip())
+                    if ok:
+                        st.session_state.show_full = True
+                        st.session_state.paid_token = token
+                        st.success("✨ 支付验证成功！宇宙的秘密为你展开...")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("订单号无效或未支付，请确认已付款。如刚支付请稍等几秒再试。")
+                else:
+                    st.warning("请输入面包多订单号")
+
+        st.markdown('<p style="text-align:center;color:#7b5ea0;font-size:11px;margin-top:15px;">或者使用解锁码（老用户）</p>', unsafe_allow_html=True)
+
+        # 解锁码输入（保留作为备选）
         col_code1, col_code2, col_code3 = st.columns([1, 1.5, 1])
         with col_code2:
             user_code = st.text_input("输入解锁码", placeholder="例如: TAROT-XXXXXXXX", key="unlock_input")
-            if st.button("🔓 解锁全部内容", use_container_width=True):
+            if st.button("🔑 解锁全部内容", use_container_width=True, key="code_unlock_btn"):
                 if user_code.strip():
                     codes = _load_codes()
-                    # 检查是否是本次生成的码
                     if user_code.strip() == unlock_code:
                         mark_code_used(user_code.strip())
                         st.session_state.show_full = True
                         st.success("✨ 封印已解除！宇宙的秘密为你展开...")
                         time.sleep(1)
                         st.rerun()
-                    # 检查是否是已生成但未使用的码
                     elif user_code.strip() in codes and not codes[user_code.strip()].get("used", False):
                         mark_code_used(user_code.strip())
                         st.session_state.show_full = True
@@ -776,7 +851,7 @@ elif st.session_state.stage == "result":
                         time.sleep(1)
                         st.rerun()
                     else:
-                        st.error("解锁码无效或已被使用，请联系客服获取新码。")
+                        st.error("解锁码无效或已被使用，请使用上方面包多自动支付。")
                 else:
                     st.warning("请输入解锁码")
 
@@ -901,4 +976,23 @@ elif st.session_state.stage == "result":
 
     st.caption("⚜️ 塔罗牌是自我探索的工具，解读仅供参考娱乐。")
 
-# 侧边栏 — 安静无干扰
+# 管理员面板
+with st.sidebar:
+    st.markdown("## 管理")
+    pwd = st.text_input("密码", type="password", key="admin_pwd")
+    if pwd == "123456":
+        st.success("已解锁")
+        if st.button("生成10个解锁码"):
+            codes = _load_codes()
+            new_codes = []
+            for _ in range(10):
+                c = f"TAROT-{uuid.uuid4().hex[:8].upper()}"
+                codes[c] = {"used": False}
+                new_codes.append(c)
+            _save_codes(codes)
+            st.success(f"已生成10个码，总共{len(codes)}个")
+            for c in new_codes:
+                st.code(c)
+        st.metric("总码数", len(_load_codes()))
+    elif pwd:
+        st.error("密码错误")
